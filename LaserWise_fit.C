@@ -1,0 +1,91 @@
+#include "TFile.h"
+#include "TTree.h"
+#include <vector>
+#include "TH1D.h"
+#include "TH2D.h"
+#include "TCanvas.h"
+#include <TChain.h>
+#include "TSystem.h"
+#include "TBenchmark.h"
+#include "TStyle.h"
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+#include<TProfile.h>
+#include<TDirectory.h>
+#include<TGraph.h>
+
+
+void LaserWise_fit()
+
+{
+  TFile *file = TFile::Open("Laser_time_60hr.root");
+
+  TGraphErrors *g_amp;// *g_chi2;
+  TString channel;
+  const int N=6;//no.of lasers
+  //const int X=54;//no of xtals
+
+  gStyle->SetPalette(1);
+  double mean1[N];
+  //double chi2_1[N];
+  double m_err1[N];
+  //double c_err1[N];
+  double ch[N];
+  double ch_e[N]={0};
+  TH1D *h1[N];
+  TH3D *h[N];
+  TH3D *hCal[24];
+  TString *hname[24];
+  for(int i=0; i<N;i++) {
+    ch[i]=i+1;
+    h1[i] = new TH1D();
+    //cout<<i<<" OK1\n";
+  }
+  int laser=0;
+  int in=0;
+
+  for(int i=0;i<6;i++)
+    h[i]=new TH3D("","",80,20e3,200e3,1000,1999,2001,54,0,54);
+    
+    //cout<<i<<" OK1\n";
+
+  for(int i=0;i<24;i++){
+    hname[i]=new TString();
+    hname[i]->Form("hFirstTime1_%d",i+1);
+    //cout<<hname[i]->Data()<<" OK--2\n";
+    hCal[i] = (TH3D*)file->Get(hname[i]->Data());
+  }
+  for(int k=0;k<6;k++){
+    for(int l=0; l<4;l++){
+      h[k]->Add(hCal[laser]);
+      laser++;
+    }
+  }
+  
+  
+  for(int i=0;i<6;i++){
+    //for(int j=0;j<54;j++){
+    //h[i]->GetZaxis()->SetRange(j,j+1);
+    h1[in]=(TH1D*)h[i]->ProjectionY();
+    TFitResultPtr g = h1[in]->Fit("gaus","QS");//option S is required
+    mean1[in]=g->Parameter(1)*1.25;
+    m_err1[in]=g->Parameter(2)*1.25/sqrt(g->Ndf());;
+    in++;
+      //cout<<"OK--3\n";
+  }
+  //in++;
+
+  cout<<in<<"\n";
+  g_amp = new TGraphErrors(N,ch,mean1,ch_e,m_err1);
+  //g_amp->SetTitle("Ratio of Amplitude (second to first) pulse of all LM");
+  //g_amp->SetTitle("Pedestals of all LM");
+  //g_amp->SetTitle("Amplitude first pulse of all LM");
+  g_amp->GetXaxis()->SetTitle("Laser #");
+  g_amp->GetYaxis()->SetTitle("#Delta Time (ns) ");
+  //g_amp->GetYaxis()->SetTitle("Average Pedestal(ADC)");
+  //g_amp->GetYaxis()->SetTitle("Time diff (ns)");
+  g_amp->SetMarkerColor(kBlue);
+  g_amp->SetMarkerStyle(kFullTriangleUp);
+  g_amp->Draw("AP");
+}
