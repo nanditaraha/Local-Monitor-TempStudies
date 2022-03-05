@@ -1,0 +1,291 @@
+//Plots the gain function with SiPM, SM and LM corrections - to check long term gain stability.
+//This is a new implementation based on what Matthias did.
+//#include <math.h>       /* remainder */
+int no_cycles = 4;//The number of cycles in a subrun
+int prescale_fac = 10;//Used a prescale factor of 10 (every 10th fill has laser pulses)
+double T0G=432.e3*5.2e6;
+double t24h=24*3600.e6;
+double G(double *x, double *par){
+  double t=*x;
+  //  return 0.992*(1 - 0.04*exp(-t-29/3.));
+  //  return 0.992*(1 - 0.04*exp(-t/3.));
+  return 0.992*(1 - 0.04*exp(-t/30.));
+}
+//double L(double t, double T){
+double L(double T){
+  double xL= 100*(1.+0.05*T/216000e6);
+  //double xL= 100;//*(1.+0.05*T/216000e6);
+  return  gRandom->Gaus(xL,0.01*xL);
+  //    double xL= 100;
+    //    return xL;
+    //    return  gRandom ->Gaus(xL,0.02*xL);  
+}
+double Source(double T){
+  double c=1;
+  //  return gRandom ->Gaus(c,0.001*c)*L(T);
+  return c*L(T);
+}
+double Sipm0(double T){
+  double c=10;
+  //double c=(1+T*8./3600e6 + cos(2*TMath::Pi()*T/t24h));
+  //double c=10*(1-sin(2*TMath::Pi()/t12h*remainder(T,t12h)));
+  int num = (int)T;
+  int den = (int)t24h;
+  //double c=10*(1-sin(2*TMath::Pi()/t24h*(num%den)));
+  //  return gRandom ->Gaus(c,0.001*c)*L(T);//
+  //return gRandom->Gaus(c,0.01*c)*L(T);
+  return c*L(T);
+}
+double Sipmi(double T, double t){
+  double c=10.;
+  //double c=(1+T*8./3600e6 + cos(2*TMath::Pi()*T/t24h));  
+  //double c=10*(1-sin(2*TMath::Pi()/t12h*remainder(T,t12h)));
+  int num = (int)T;
+  int den = (int)t24h;
+  //double c=10*(1-sin(2*TMath::Pi()/t12h*num%den));
+  double p[1];
+  p[0]=0;
+  //return gRandom->Gaus(c,0.01*c)*G(&t,p)*L(T);
+  return c*G(&t,p)*L(T);
+}
+
+int Gain_2(){
+  TF1 *f = new TF1("Gain",G,0.,500,0); 
+  //new TCanvas;
+  f->SetNpx(1000);
+  //f->Draw();
+  double T0=0;
+  double tc=5;//sync pulse time
+  double TC=0;
+  double T=0;
+  double T0C=0;
+  double tf1=30;
+  double tf2=200;
+  double tf3=400;
+  double TF1=0;
+  double TF2=0;
+  double TF3=0;
+  double tfill=2000;//width of the fill in us 
+  /*
+    Out of fill times in micro-sec(us) - four OOF at, 200, 400, 600 800 us
+  */
+  double tof1=200;
+  double tof2=400;//Should this be 200 or 400???
+  double tof3=600;
+  double tof4=800;
+
+  //Absoulte times of OOF
+  double TOF1=0;
+  double TOF2=0;
+  double TOF3=0;
+  double TOF4=0;
+
+  double Sm=0;
+  double S0=0;//999.;
+  double Q0=0;//999.;
+  double S0_av=0;
+  double Q0_av=0;
+  double cs=0.;
+  double Si[48];
+  double Qi[48];
+  double A[48];
+  double A0[48];
+  double A02[48];
+  double EA[48];
+  double EX[48];
+  double T0s=0.;
+  double T0F=0;
+  double csav=0;
+  double csav_1=0;
+ 
+  int presc =0;
+  int lpresc=0;
+  //int ns=10; //100 cicli (1sub=4 cicli)
+  //int ns=43200; //100 cicli (1sub=4 cicli)
+  int ns=432.e4; //100 cicli (1sub=4 cicli)
+  //int ns=432.e3; // //100 cicli (1subrun=4 cycles and 1000 cycles make a list - in this case)
+  int icount =0;
+  int ic;
+  int ics=0;
+  for (int iff=0;iff<48;iff++) {
+    A0[iff]=0.;
+    A02[iff]=0.;
+    EA[iff]=0;
+    EX[iff]=0;
+  }
+ 
+  for (int is=0;is<ns;is++){
+    cs=0;
+    lpresc=0;
+    T0s=5.2e6*is;//Each cycle is 1.3 s and 1 subrun = 4 cycles = 5.2s (abs time of subrun)
+    ics=0;
+    //   for (int ic=0;ic<100;ic++){
+
+    for (int iff=0;iff<48;iff++)  A[iff]=0.;
+    for (int ic=0;ic<no_cycles;ic++){ 
+      double T0c=T0s+ic*1.3e6; //1.3 s e' il tempo del cycle (abs time of cycle in a subrun)
+      presc =0;
+      if ((is*no_cycles+ic+1)%10==0 ) {
+	presc =1;
+	lpresc=1;
+      }
+      Sm=0;
+      for (int iff=0;iff<16;iff++) {
+	if(presc==1) {
+	  tf1=30+2.5*iff;//we start from 30 us in a fill
+      	  tf2=tf1+200;
+      	  tf3=tf2+200;
+      	  TF1=T0F+tf1;
+      	  TF2=T0F+tf2;
+      	  TF3=T0F+tf3;
+	  //cout<<"IFF: Source Moni 1:"<<Sm<<"\n";
+	  
+	  Sm=Sm+Source(TF1);
+	  //cout<<"IFF: Source Moni 1:"<<Sm<<"\n";	  
+	  Sm=Sm+Source(TF2);
+	  //cout<<"IFF: Source Moni 2:"<<Sm<<"\n";	  
+	  Sm=Sm+Source(TF3);
+	  //cout<<"IFF: Source Moni 3:"<<Sm<<"\n";	  
+	  
+	}
+	
+      }
+
+      
+
+      for (int iff=0;iff<16;iff++) {
+      	T0F=T0C+12.e3*iff; //2ms e' il tempo di ciascun fill  - (INfill+OOfill = 2+10 ms)
+      	TC=T0F+tc; //tempo del sync assoluto
+      	//    xl = xL_sync= gRandom ->Gaus(L,1);
+	
+      	S0=S0+Source(TC);
+      	Q0=Q0+Sipm0(TC);
+      	cs=cs+Q0/S0;//Gains of all cycles (prescale and not) - Sync pulse 
+       
+	//	call hfill cs ///*****
+	
+	
+      	if(presc==1) {
+      	  tf1=30+2.5*iff;//we start from 30 us in a fill
+      	  tf2=tf1+200;
+      	  tf3=tf2+200;
+      	  TF1=T0F+tf1;
+      	  TF2=T0F+tf2;
+      	  TF3=T0F+tf3;
+      	  Qi[iff*3]=Sipmi(TF1,tf1);
+      	  Qi[iff*3+1]=Sipmi(TF2,tf2);
+      	  Qi[iff*3+2]=Sipmi(TF3,tf3);
+	  
+	  /*
+	  cout<<"//////////////////////////\n";
+	  cout<<"Source Moni:"<<Sm<<"\n";
+	  cout<<"//////////////////////////\n";
+	  
+	  Si[iff*3]=Source(TF1);
+      	  Si[iff*3+1]=Source(TF2);
+      	  Si[iff*3+2]=Source(TF3);
+      	  
+	  */
+      	  A[iff*3]=Qi[iff*3]/(Sm/48.);
+      	  A[iff*3+1]=Qi[iff*3+1]/(Sm/48.);
+      	  A[iff*3+2]=Qi[iff*3+2]/(Sm/48.);
+	  /*  
+	  cout<< "IS ="<<is<< " IC= "<<ic<<" iff= "<<iff<<endl;
+	  	  cout<<"Si["<< iff*3<<"]= "<<Source(TF1)<<endl;
+	  	  cout<<"Qi["<< iff*3<<"]= "<<Sipmi(TF1,tf1)<<endl;
+	  	  cout<<"A["<< iff*3<<"]= "<<Qi[iff*3]/Si[iff*3]<<endl;
+
+	   cout<<"Si["<< iff*3+1<<"]= "<<Source(TF2)<<endl;
+	   cout<<"Qi["<< iff*3+1<<"]= "<<Sipmi(TF2,tf2)<<endl;
+	   cout<<"A["<< iff*3+1<<"]= "<<Qi[iff*3+1]/Si[iff*3+1]<<endl;
+
+	   cout<<"Si["<< iff*3+2<<"]= "<<Source(TF3)<<endl;
+	   cout<<"Qi["<< iff*3+2<<"]= "<<Sipmi(TF3,tf3)<<endl;
+	   cout<<"A["<< iff*3+2<<"]= "<<Qi[iff*3+2]/Si[iff*3+2]<<endl;
+	  */
+	  
+      	}
+	tof1=tfill+200;
+	tof2=tfill+400;
+	tof3=tfill+600;
+	tof4=tfill+800;
+	TOF1=T0F+tof1;
+	TOF2=T0F+tof2;
+	TOF3=T0F+tof3;
+	TOF4=T0F+tof4;
+	S0=S0+Source(TOF1);
+	Q0=Q0+Sipm0(TOF1);
+	cs=cs+Q0/S0;
+	//	cout<<"is= "<<is<<" ic= "<<ic<<" CS = "<<cs<<" ics= "<<ics++<<endl;
+	S0=S0+Source(TOF2);
+	Q0=Q0+Sipm0(TOF2);
+	cs=cs+Q0/S0;
+	//	cout<<"is= "<<is<<" ic= "<<ic<<" CS = "<<cs<<" ics= "<<ics++<<endl;
+	S0=S0+Source(TOF3);
+	Q0=Q0+Sipm0(TOF3);
+	cs=cs+Q0/S0;
+	//	cout<<"is= "<<is<<" ic= "<<ic<<" CS = "<<cs<<" ics= "<<ics++<<endl;
+	S0=S0+Source(TOF4);
+	Q0=Q0+Sipm0(TOF4);
+	cs=cs+Q0/S0;
+	//	cout<<"is= "<<is<<" ic= "<<ic<<" CS = "<<cs<<" ics= "<<ics++<<endl;
+      }
+      //16*5*4
+
+      if(lpresc==1){
+	for (int iff=0;iff<48;iff++) {
+	  //A[iff]=Qi[iff]/(Sm/48.);	        
+	  //cout<<"IF:is= "<<is<<" ic= "<<ic<<" A["<<iff<<"]= "<<A[iff]<<endl;
+	}
+      }
+    }
+    S0_av=S0/(16.*5*no_cycles);
+    Q0_av=Q0/(16.*5*no_cycles);
+    csav_1 = Q0_av/S0_av;
+    csav=cs/(16.*5*no_cycles);
+
+    //normalizzo i fill per ciascun subrun      
+    //    cout<<"is= "<<is<<" ic= "<<ic<<" CSAVG = "<<csav<<" prescale = "<<lpresc<<endl;
+    if(lpresc==1){
+      for (int iff=0;iff<48;iff++) {
+	A[iff]=A[iff]/csav_1;	        
+	//cout<<"OOF:is= "<<is<<" ic= "<<ic<<" A["<<iff<<"]= "<<A[iff]<<endl;
+      }
+    }
+    //    cout<<"is= "<<is<<" ic= "<<ic<<" prescale = "<<presc<<endl;
+    if(lpresc==1){
+      ++icount;
+      //      cout<<"incount= "<<icount<<endl;
+      for (int iff=0;iff<48;iff++){
+	A0[iff]=A0[iff]+A[iff];
+	A02[iff]=A02[iff]+A[iff]*A[iff];
+      }
+    }
+    
+  }//conclude il loop sugli ns
+  cout<<"incount= "<<icount<<endl;
+  Double_t x[48];
+  for (int iff=0;iff<16;iff++) {
+    x[3*iff]=30.+2.5*iff;
+    x[3*iff+1]=30.+2.5*iff+200;
+    x[3*iff+2]=30.+2.5*iff+400;
+    A0[3*iff]=A0[3*iff]/icount;
+    A0[3*iff+1]=A0[3*iff+1]/icount;
+    A0[3*iff+2]=A0[3*iff+2]/icount;
+    A02[3*iff]=A02[3*iff]/icount;
+    A02[3*iff+1]=A02[3*iff+1]/icount;
+    A02[3*iff+2]=A02[3*iff+2]/icount;
+    EA[3*iff]=sqrt(A02[3*iff]-A0[3*iff]*A0[3*iff])/sqrt(icount);
+    EA[3*iff+1]=sqrt(A02[3*iff+1]-A0[3*iff+1]*A0[3*iff+1])/sqrt(icount);
+    EA[3*iff+2]=sqrt(A02[3*iff+2]-A0[3*iff+2]*A0[3*iff+2])/sqrt(icount);
+	      
+  }
+  //  new TCanvas;  
+  //  TGraph *gr1 = new TGraph(48, x, A0);
+  TGraphErrors *gr1 = new TGraphErrors(48, x, A0,EX,EA);
+  gr1->Draw("A*");
+  f->Draw("same");
+  TFile *f1 = new TFile("gainSim_e6_1.root", "RECREATE");
+  gr1->Write("Gain_LM");
+  return 0;
+}

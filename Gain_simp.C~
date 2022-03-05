@@ -1,0 +1,83 @@
+//Plots the gain function with SiPM, SM and LM corrections - to check long term gain stability.
+//LM not yet implemented in this code - will do.
+//#include <math.h>       /* remainder */
+
+double T0G=432.e3*5.2e6;
+double t24h=24*60; //day night frequency in mins
+//double t12h=12*3600.e6; //in us
+/*
+double G(double *x, double *par){
+  double t=*x;
+  //  return 0.992*(1 - 0.04*exp(-t-29/3.));
+  //  return 0.992*(1 - 0.04*exp(-t/3.));
+  return 0.992*(1 - 0.04*exp(-t/30.));
+}
+*/
+//double L(double t, double T){
+double L(double T){
+  double xL= 100*(1.+0.05*T/216000e6);//laser shots-5% drift in 3 days
+  return  gRandom->Gaus(xL,0.01*xL);
+  
+}
+
+double Sipm0(double T){
+  //double c=10;
+  //double c=10*(1-sin(2*TMath::Pi()/t12h*remainder(T,t12h)));
+  int num = (int)T;
+  int den = (int)t24h;
+  double c=(1600-T*8./3600 + cos(2*TMath::Pi()*T/t24h));
+  //  return gRandom ->Gaus(c,0.001*c)*L(T);//
+  return c;
+  //return c*L(T);
+}
+double my_Simp0(double *x, double *par)
+{
+  double xx=x[0];
+  double f=par[0]*Sipm0(xx);
+  return f;
+}
+
+void Gain_simp(){
+  
+  TF1 *f = new TF1("f",my_Simp0,0, 3600,1);
+  f->SetParameter(0,1);
+  f->Draw();
+  /*
+  double T = 0;
+  double tof1=200;
+  double tof2=200;
+  double tof3=600;
+  double tof4=800;
+  int cycles = 1.7e9;
+  int ns=432e3;
+
+  //Absoulte times of OOF
+  double TOF1=0;
+  double TOF2=0;
+  double TOF3=0;
+  double TOF4=0;
+  double tfill=2000;
+
+  TH2D *h1 = new TH2D();
+  for (int n=0;n<cyles;n++) {
+
+    for (int iff=0;iff<16;iff++) {
+      tof1=tfill+200;
+      tof2=tfill+400;
+      tof3=tfill+600;
+      tof4=tfill+800;
+      TOF1=T0F+tof1;
+      TOF2=T0F+tof2;
+      TOF3=T0F+tof3;
+      TOF4=T0F+tof4;
+      h1->Fill(Sipm0(TOF1),TOF1);
+      h1->Fill(Sipm0(TOF2),TOF2);
+      h1->Fill(Sipm0(TOF3),TOF3);
+      h1->Fill(Sipm0(TOF4),TOF4);
+    }
+
+  }
+  h1->ProfileX()->Draw();
+  */
+
+}

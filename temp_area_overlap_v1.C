@@ -1,0 +1,98 @@
+
+{
+
+  //I can't use cout and cin statements and canvas updates due to new xcode installation
+
+   //example of macro illustrating how to superimpose two histograms
+   //with different scales in the "same" pad.
+  //Try differently - normalize to unity all plot and then overlap
+   TCanvas *c1 = new TCanvas("c1","example of two overlapping pads",600,400);
+
+   //create/fill draw h1
+   gStyle->SetOptStat(kFALSE);
+   
+   
+   TString fileName = "amp_profile_9days.root"; //"amp_profile_18413.root"; //"amp_profile_16409_16514_myV1.root"; 
+   TString tempName = "temp_9days_set1.csv";//"temp_18413.csv";//"temp_16409_16514.csv";//"temp_60h_1.csv";//
+   //TString fileName = "amp_profile_16409_16514_myV1.root"; 
+   //TString tempName = "temp_16409_16514.csv";//"temp_60h_1.csv";//
+
+   TFile *file = TFile::Open(fileName,"READ");
+   TProfile *hAmp1_8 = (TProfile*)file->Get("hAmp1_8");
+   TProfile *hAmp2_8 = (TProfile*)file->Get("hAmp2_8");
+   
+   TGraph *g = new TGraph(tempName, "%lg %*lg %lg"," ");//%*lg is for the unwanted columns - table
+   Int_t N=g->GetN();  
+   Double_t *room_temp=g->GetY();   
+
+   int max_range = (hAmp1_8->GetXaxis()->GetXmax()- hAmp1_8->GetXaxis()->GetXmin())/60.;
+   //double maxi = max_range-N;// for runs from 16409-16514
+   double maxi = N-1031;// for runs starting from 0
+   int first_bin = 1172, last_bin = 2459;//Has to be taken from the histogram (first bin with data)...
+   //int first_bin = 607, last_bin = 1212;//for run 18413
+   //int first_bin = 2, last_bin = 1204;//for run 18422
+   int max_bin = hAmp1_8->FindBin(N); 
+   int rebin = 4;//rebin for A1
+   int rebin1 = 4;//rebin for A2
+
+   TH1F *h2 = new TH1F("h2","my histogram",N,0,N);
+   TH1F *h1 = new TH1F("h1","my histogram",N,0,N);
+   hAmp1_8->Scale(1/hAmp1_8->GetBinContent(first_bin));
+   hAmp1_8->Rebin(rebin);//To be done only when using amp_all_channels_profile_60hr.root
+   hAmp1_8->GetXaxis()->SetTitle("Time (min)");
+   
+   hAmp2_8->Scale(1/hAmp2_8->GetBinContent(first_bin));
+   hAmp2_8->Rebin(rebin1);//To be done only when using amp_all_channels_profile_60hr.root
+   hAmp2_8->GetXaxis()->SetTitle("Time (min)");
+   
+   hAmp1_8->GetXaxis()->SetRange(first_bin/rebin,last_bin/rebin);//Set range from first bin with data to last bin
+   hAmp1_8->GetXaxis()->SetLimits(0-maxi,max_range-maxi);
+
+   hAmp2_8->GetXaxis()->SetRange(first_bin/rebin1,last_bin/rebin1);//Set range from first bin with data to last bin
+   hAmp2_8->GetXaxis()->SetLimits(0-maxi,max_range-maxi);
+
+   hAmp1_8->Draw();
+
+   hAmp1_8->SetStats(0);
+   
+   for(int i=0; i<N;i++) h1->SetBinContent(i+1,room_temp[i]);
+   //int a = hAmp1_8->Integral()+ 12740 - min_pt*max_bin; //added 12740 for the empty bins in 9 days (part 1) set.
+   //int a = hAmp2_8->Integral();//+7*1595 +4*1592 - min_pt*(max_bin-121);; // added for empty bins of 16409_16514
+   int a = hAmp1_8->Integral();// - min_pt*(max_bin);//For no empty bins
+   //int b = h1->Integral();// - 1595*2759;
+
+   float factor=1.5;//0.5;
+   Float_t scale = factor*rebin*a/h1->Integral();//Others
+   //Float_t scale = 5*hAmp1_8->Integral()/h1->Integral();//for 60 hrs
+   h2->SetLineColor(kRed);
+   //h2->SetMarkerStyle();
+   h1->Scale(scale);  
+   //OK for hAmp1_8
+   //double shift_bin = h1->GetBinContent(1)-hAmp1_8->GetBinContent(first_bin/rebin +1)+0.002;
+   double shift_bin = h1->GetBinContent(1)-hAmp1_8->GetBinContent(first_bin/rebin +1)+0.004;
+   //for(int i=0; i<N;i++) h2->SetBinContent(i+1,h1->GetBinContent(i+1)+shift_bin-7);//for 60 hrs
+   for(int i=0; i<N;i++) h2->SetBinContent(i+1,h1->GetBinContent(i+1)-shift_bin);//for 60 hrs
+   
+   /*
+   //OK for hAmp2_8
+   double shift_bin = h1->GetBinContent(1)-0.996;
+   //for(int i=0; i<N;i++) h2->SetBinContent(i+1,h1->GetBinContent(i+1)+shift_bin-7);//for 60 hrs
+   for(int i=0; i<N;i++) h2->SetBinContent(i+1,h1->GetBinContent(i+1)-shift_bin);//for 60 hrs
+   */
+   
+   h2->Draw("same");
+
+   //NOTE: Since I can't use update - have to excute the rest cmds in root prompt interactively
+   /*
+   Float_t rightmax = h1->GetMaximum();
+   //9 days part 1   
+   TGaxis *axis = new TGaxis(gPad->GetUxmax(),0.996939, gPad->GetUxmax(), 1.00106,31.8,32.8,20,"+L");//for 3600 bins
+   //9 days part 2   
+   TGaxis *axis = new TGaxis(gPad->GetUxmax(),0.994, gPad->GetUxmax(), 1,31.6,33,20,"+L");//for 3600 bins
+   axis->SetLineColor(kRed);
+   axis->SetTextColor(kRed);
+   axis->Draw();axis->SetLineColor(kRed);
+   axis->SetTextColor(kRed);
+   axis->Draw();
+   */
+}
