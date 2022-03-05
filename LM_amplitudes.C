@@ -1,0 +1,145 @@
+/*All 1st April dataset - to compare old and new PMT's. Calo 11, 12, 13, 18 and 20 are connected to the new PMTs that are 
+channel 5, 0, 6, 8 and 4 and the old ones are from 25....29  for these calo's respectively.
+*/
+#include "TFile.h"
+#include "TTree.h"
+#include <vector>
+#include "TH1D.h"
+#include "TH2D.h"
+#include "TCanvas.h"
+#include "TSystem.h"
+#include "TBenchmark.h"
+#include "TStyle.h"
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
+#include<TProfile.h>
+#include<TDirectory.h>
+
+double drop_a1[23]={0};
+double drop_a2[23]={0};
+
+double err_a1[23]={0};
+double err_a2[23]={0};
+
+void LM_amp(int new_ch=0, int rebin=1) 
+{
+  //TString fileName("amp_profile_16409_16514_myV1.root");// 1st april - we use this...
+  TString fileName("amp_profile_9days.root"); 
+  TString new_a1, new_a2, old_a1,old_a2, new_ar1,  old_ar2, file_name1;
+  TCanvas *c1 = new TCanvas;
+  //int init_bin = 607/rebin; //Check from histogram - for run 18413
+  int init_bin = 1172; //Check from histogram - for run 18422
+  int factor = 1;
+  //int final_bin = 1060/rebin;//there was intervention after this - for run 18413
+  int final_bin = 2459;//there was intervention after this - for run 18422
+  
+
+  gStyle->SetOptStat(0);
+  gStyle->SetOptFit(1);
+  TFile *file = TFile::Open(fileName,"READ");
+  if (!file) { return; }
+  
+  new_a1.Form("hAmp1_%d",new_ch);
+  new_a2.Form("hAmp2_%d",new_ch);
+
+  file_name1.Form("amplitudes_run16409_16514_myV1_ch%d.root",new_ch);
+  //file_name1.Form("ratio_of_ratios_16352_calo_%d.root",calo);
+  
+  TProfile *new_p1 = (TProfile*)file->Get(new_a1.Data());
+  TProfile *new_p2 = (TProfile*)file->Get(new_a2.Data());  
+  new_p1->Rebin(rebin);
+  new_p2->Rebin(factor*rebin);
+
+  new_p1->GetXaxis()->SetRange(init_bin/rebin,(init_bin+300)/rebin);
+  double mean1 = new_p1->GetMean(2);
+  double scale_bin1 = mean1; //607 for run 18413 //Check from histogram. 
+  new_p1->GetXaxis()->SetRange(init_bin/rebin,final_bin/rebin);
+
+  new_p2->GetXaxis()->SetRange(init_bin/(rebin*factor),(init_bin+300)/(rebin*factor));
+  double mean2 = new_p2->GetMean(2);
+  double scale_bin2 = mean2;
+  new_p2->GetXaxis()->SetRange(init_bin/(rebin*factor),final_bin/(rebin*factor));
+
+  new_p1->Scale(1/scale_bin1);
+  new_p2->Scale(1/scale_bin2);
+
+  TH1D *new_h1 = (TH1D*)new_p1->ProjectionX();
+  TH1D *new_h2 = (TH1D*)new_p2->ProjectionX();
+ 
+  new_h2->Divide(new_h1);
+  new_h2->GetYaxis()->SetRangeUser(0.994,1.008);
+  TF1 *f = new TF1("f","pol1");
+  new_h2->Fit("f");
+  new_h2->Draw();
+  //new_h2->Scale(1/new_h2->GetBinContent(scale_bin));
+  /*
+  new_p2->SetLineColor(kRed);
+  new_p1->GetXaxis()->SetTitle("Time (unix time)");
+  new_p2->GetXaxis()->SetTitle("Time (unix time)");
+  
+  new_p2->GetYaxis()->SetRangeUser(0.994,1.008);
+  new_p1->GetYaxis()->SetRangeUser(0.994,1.008);
+
+  
+  //TF1 *f = new TF1("f","pol1");
+  new_p2->Fit("f");
+  f->SetLineColor(kBlue+2);
+  drop_a2[new_ch]=f->GetParameter(1);
+  err_a2[new_ch]=f->GetParError(1);
+  //new_p2->GetListOfFunctions()->Remove(st);
+  new_p1->Fit("f");
+  drop_a1[new_ch]=f->GetParameter(1);
+  err_a1[new_ch]=f->GetParError(1);
+  
+  
+  //new_p1->Draw();
+  c1->Update();
+  TPaveStats *st = (TPaveStats*)c1->GetPrimitive("stats");
+  st->SetLineColor(kBlue+2);
+  st->SetTextColor(kBlue+2);
+  //st->SetX1NDC(1533.942e6);
+  //st->SetX2NDC(1533.944e6);
+  st->Draw();
+  //new_p2->Draw("sames");
+  
+  
+  //gPad->Update();
+  //new_p1->GetXaxis()->SetTitle("Time (unix time)");
+  //new_p2->GetXaxis()->SetTitle("Time (unix time)");
+  //ar1, ar2, a1_1, a1_2, a2_1,a2_2
+  
+  TFile *f1 = new TFile( file_name1.Data(),"RECREATE");
+  //TFile *f1 = new TFile( "test.root","RECREATE");
+  new_h2->Write("Amp_ratio");
+  new_p1->Write("Amp1");
+  new_p2->Write("Amp2");
+  */
+}
+
+/*
+void LM_amplitudes()
+{
+  //For one channel:
+  //LM_amp(4, 1);
+  //For plotting a graph
+  
+  double err_x[23]={0};
+  double x[23]={0};
+  for (int i=0;i<23;i++) 
+    {
+      LM_amp(i, 1);
+      x[i]=i+1;
+    }
+  TGraphErrors *tg = new TGraphErrors(23,x,drop_a1,err_x,err_a1);
+  TGraphErrors *tg1 = new TGraphErrors(23,x,drop_a2,err_x,err_a2);
+  tg->GetXaxis()->SetTitle("Channel no.");
+  tg->GetYaxis()->SetTitle("Drop in A1/sec");
+
+  tg1->GetXaxis()->SetTitle("Channel no.");
+  tg1->GetYaxis()->SetTitle("Drop in A2/sec");
+
+  tg->Draw("ap");
+  
+}
+*/
